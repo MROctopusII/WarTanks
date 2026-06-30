@@ -5,6 +5,7 @@ const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const ROOT_DIR = __dirname;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -18,28 +19,72 @@ const MIME = {
   '.json': 'application/json; charset=utf-8'
 };
 
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  let pathname = decodeURIComponent(url.pathname);
-  if (pathname === '/') pathname = '/index.html';
-  const filePath = path.normalize(path.join(PUBLIC_DIR, pathname));
-  if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403);
-    res.end('Forbidden');
-    return;
-  }
+function safeStaticPath(baseDir, pathname) {
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedFile = path.resolve(path.join(resolvedBase, pathname.replace(/^\/+/, '')));
+  return resolvedFile.startsWith(resolvedBase + path.sep) || resolvedFile === resolvedBase ? resolvedFile : null;
+}
+
+function sendFile(res, filePath) {
   fs.readFile(filePath, (err, data) => {
     if (err) {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
       res.end('Not found');
       return;
     }
-    res.writeHead(200, { 'content-type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'content-type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+      'cache-control': 'no-store'
+    });
     res.end(data);
   });
+}
+
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let pathname = decodeURIComponent(url.pathname);
+
+  if (pathname === '/health' || pathname === '/healthz') {
+    res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(JSON.stringify({ ok: true, players: players.size, uptime: Math.round(process.uptime()) }));
+    return;
+  }
+
+  if (pathname === '/') pathname = '/index.html';
+
+  // Normal Render layout: public/index.html, public/game.js, public/styles.css, public/images/...
+  // Fallback layout: root index.html/game.js/styles.css, useful if files were accidentally moved out of public.
+  const candidates = [
+    safeStaticPath(PUBLIC_DIR, pathname),
+    safeStaticPath(ROOT_DIR, pathname),
+    pathname.startsWith('/images/') ? safeStaticPath(path.join(PUBLIC_DIR), pathname) : null
+  ].filter(Boolean);
+
+  for (const filePath of candidates) {
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      sendFile(res, filePath);
+      return;
+    }
+  }
+
+  res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+  res.end('Not found');
 });
 
 const wss = new WebSocketServer({ server });
+
+function heartbeat() { this.isAlive = true; }
+wss.on('connection', ws => {
+  ws.isAlive = true;
+  ws.on('pong', heartbeat);
+});
+setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) { try { ws.terminate(); } catch (_) {} continue; }
+    ws.isAlive = false;
+    try { ws.ping(); } catch (_) {}
+  }
+}, 25000);
 
 const WORLD = { w: 20000, h: 14000 };
 const TANK_RADIUS = 42;
@@ -294,6 +339,7 @@ function broadcast() {
 
 wss.on('connection', ws => {
   let playerId = null;
+  console.log('client connected');
   ws.on('message', raw => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch (_) { return; }
@@ -326,6 +372,7 @@ wss.on('connection', ws => {
 
   ws.on('close', () => {
     if (playerId) players.delete(playerId);
+    console.log('client disconnected');
   });
   ws.on('error', () => {
     if (playerId) players.delete(playerId);

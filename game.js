@@ -204,6 +204,12 @@
   }
 
   function websocketURL() {
+    const params = new URLSearchParams(location.search || '');
+    const forced = params.get('server') || localStorage.getItem('wartanksServer') || '';
+    if (forced) {
+      if (/^wss?:\/\//i.test(forced)) return forced;
+      return (location.protocol === 'https:' ? 'wss://' : 'ws://') + forced.replace(/^https?:\/\//i, '');
+    }
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     if (location.host) return `${proto}//${location.host}`;
     return 'ws://localhost:3000';
@@ -242,11 +248,11 @@
     });
     socket.addEventListener('close', () => {
       connected = false;
-      if (running && deathReturnTimer === null) connectionStatus = 'disconnected';
+      if (running && deathReturnTimer === null) connectionStatus = 'disconnected - open the Render app URL, not local index.html';
     });
     socket.addEventListener('error', () => {
       connected = false;
-      connectionStatus = 'connection error';
+      connectionStatus = 'connection error - WebSocket failed';
     });
   }
   function disconnectOnline(closeSocket = true) {
@@ -484,7 +490,7 @@
     ctx.strokeStyle = '#000';
     ctx.fillStyle = '#fff0a0';
     ctx.font = 'bold 20px Verdana, Arial, sans-serif';
-    const txt = connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected';
+    const txt = connectionStatus === 'connecting' ? 'Connecting...' : connectionStatus;
     ctx.strokeText(txt, view.w / 2, 42);
     ctx.fillText(txt, view.w / 2, 42);
     ctx.restore();
