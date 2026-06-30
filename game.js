@@ -16,8 +16,7 @@
   const colorPreview = document.getElementById('colorPreview');
   const colorHex = document.getElementById('colorHex');
   const movementButtons = Array.from(document.querySelectorAll('.movementButton'));
-  const DEFAULT_SERVER_HOST = 'wartanks-tbt6.onrender.com';
-  const serverInput = document.getElementById('serverInput');
+  const SERVER_URL = 'https://wartanks-tbt6.onrender.com';
 
   const bodyImg = new Image();
   const turretImg = new Image();
@@ -205,46 +204,19 @@
     }
   }
 
-  function normalizeServerAddress(raw) {
-    raw = String(raw || '').trim();
-    if (!raw) return '';
-    raw = raw.replace(/^https?:\/\//i, '').replace(/^wss?:\/\//i, '');
-    raw = raw.replace(/\/+$/, '');
-    return raw;
-  }
-
   function websocketURL() {
-    const params = new URLSearchParams(location.search || '');
-    const fromQuery = params.get('server') || params.get('ws') || '';
-    const fromInput = serverInput ? serverInput.value : '';
-    const fromStorage = (() => {
-      try { return localStorage.getItem('wartanksServer') || ''; } catch (_) { return ''; }
-    })();
-    const forced = normalizeServerAddress(fromQuery || fromInput || fromStorage || DEFAULT_SERVER_HOST);
-
-    if (forced) {
-      const proto = location.protocol === 'http:' ? 'ws://' : 'wss://';
-      return proto + forced;
-    }
-
-    // If the frontend is on GitHub Pages, it cannot host WebSockets.
-    // In that case the player must enter the Render app host in the Server box.
-    if (/github\.io$/i.test(location.hostname || '')) return null;
-
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    if (location.host) return `${proto}//${location.host}`;
-    return 'ws://localhost:3000';
+    // Server hardcoded for the GitHub Pages frontend.
+    // Browser WebSocket needs wss://, so the Render https:// URL is converted here.
+    return SERVER_URL.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://').replace(/\/+$/, '');
   }
+
   function connectOnline() {
     disconnectOnline(false);
     connectionStatus = 'connecting';
     const url = websocketURL();
     if (!url) {
-      connectionStatus = 'enter Render server URL';
+      connectionStatus = 'Render server missing';
       return;
-    }
-    if (serverInput && serverInput.value.trim()) {
-      try { localStorage.setItem('wartanksServer', normalizeServerAddress(serverInput.value)); } catch (_) {}
     }
     const socket = new WebSocket(url);
     ws = socket;
@@ -277,7 +249,7 @@
     });
     socket.addEventListener('close', () => {
       connected = false;
-      if (running && deathReturnTimer === null) connectionStatus = 'disconnected - check Render server URL';
+      if (running && deathReturnTimer === null) connectionStatus = 'disconnected - Render server unreachable';
     });
     socket.addEventListener('error', () => {
       connected = false;
@@ -630,12 +602,6 @@
   startBtn.addEventListener('click', startGame);
   movementButtons.forEach(btn => btn.addEventListener('click', () => setMovementStyle(btn.dataset.style)));
   [rInput, gInput, bInput].forEach(el => el.addEventListener('input', updateColorPreview));
-  if (serverInput) {
-    try {
-      const savedServer = localStorage.getItem('wartanksServer') || '';
-      serverInput.value = savedServer || DEFAULT_SERVER_HOST;
-    } catch (_) {}
-  }
 
   Promise.all([loadImage(bodyImg), loadImage(turretImg), loadImage(grassImg), loadImage(bodyLightImg), loadImage(bodyShadowImg), loadImage(turretLightImg), loadImage(turretShadowImg), loadImage(explosionImg), loadImage(smokeImg)]).then(() => {
     setMovementStyle(movementStyle);

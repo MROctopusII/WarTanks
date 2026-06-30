@@ -33,3 +33,7 @@ If you open the Render app URL directly, the Server box can stay empty because t
 Render URL default patch:
 - Default online server set to wartanks-tbt6.onrender.com.
 - GitHub Pages client can connect without manually typing the server URL.
+
+Hardcoded Render server patch:
+- Server input removed from title screen.
+- Client always connects to https://wartanks-tbt6.onrender.com via WebSocket.
