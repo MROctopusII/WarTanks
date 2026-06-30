@@ -29,3 +29,7 @@ Open the GitHub Pages URL with query param:
 ?server=wartanks-online.onrender.com
 
 If you open the Render app URL directly, the Server box can stay empty because the frontend and WebSocket are on the same host.
+
+Render URL default patch:
+- Default online server set to wartanks-tbt6.onrender.com.
+- GitHub Pages client can connect without manually typing the server URL.

@@ -16,6 +16,7 @@
   const colorPreview = document.getElementById('colorPreview');
   const colorHex = document.getElementById('colorHex');
   const movementButtons = Array.from(document.querySelectorAll('.movementButton'));
+  const DEFAULT_SERVER_HOST = 'wartanks-tbt6.onrender.com';
   const serverInput = document.getElementById('serverInput');
 
   const bodyImg = new Image();
@@ -219,7 +220,7 @@
     const fromStorage = (() => {
       try { return localStorage.getItem('wartanksServer') || ''; } catch (_) { return ''; }
     })();
-    const forced = normalizeServerAddress(fromQuery || fromInput || fromStorage);
+    const forced = normalizeServerAddress(fromQuery || fromInput || fromStorage || DEFAULT_SERVER_HOST);
 
     if (forced) {
       const proto = location.protocol === 'http:' ? 'ws://' : 'wss://';
@@ -632,7 +633,7 @@
   if (serverInput) {
     try {
       const savedServer = localStorage.getItem('wartanksServer') || '';
-      if (savedServer) serverInput.value = savedServer;
+      serverInput.value = savedServer || DEFAULT_SERVER_HOST;
     } catch (_) {}
   }
 
